@@ -1,0 +1,12 @@
+[project]
+name = "scowalt-skills-dev"
+version = "0.1.0"
+description = "Development checks for the scowalt/skills collection"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = ["skills-ref==0.1.0"]
+
+[tool.uv.sources]
+skills-ref = { git = "https://github.com/agentskills/agentskills.git", rev = "69ef37e9424c0a7ea9dd2293b559e43ec8176379", subdirectory = "skills-ref" }

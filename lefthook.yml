@@ -1,0 +1,6 @@
+pre-commit:
+  commands:
+    gitleaks:
+      run: mise exec -- gitleaks git --pre-commit --staged --redact --no-banner
+    check:
+      run: mise run check

@@ -1,0 +1,14 @@
+[tools]
+python = "3.14.8"
+uv = "0.13.1"
+gitleaks = "8.30.1"
+lefthook = "2.2.2"
+
+[tasks.validate]
+run = "uv run --locked python scripts/validate_skills.py"
+
+[tasks.test]
+run = "uv run --locked python -m unittest discover -s tests -v"
+
+[tasks.check]
+depends = ["validate", "test"]

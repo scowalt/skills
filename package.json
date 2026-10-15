@@ -1,0 +1,18 @@
+{
+  "name": "@scowalt/skills",
+  "version": "0.1.0",
+  "description": "Reusable Agent Skills for Pi coding agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scowalt/skills.git"
+  },
+  "keywords": ["pi-package", "agent-skills"],
+  "files": ["skills", "LICENSE", "README.md"],
+  "pi": {
+    "skills": ["./skills"],
+    "extensions": [],
+    "prompts": [],
+    "themes": []
+  }
+}
