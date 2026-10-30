@@ -1,10 +1,14 @@
 # skills
 
-Scott's reusable skills for [Pi](https://pi.dev), using the open
-[Agent Skills format](https://agentskills.io/specification).
+Scott's reusable skills for [Pi](https://pi.dev) and other agents, using the
+open [Agent Skills format](https://agentskills.io/specification).
 
-This is a starter collection: **no active skills are included yet**. The example
-is an authoring template, not something installed into your agent.
+| Skill | What it does |
+| --- | --- |
+| [crayon-drawing](skills/crayon-drawing/SKILL.md) | Draws how something works as a crayon storyboard, built as one self-contained HTML page. |
+
+The example in `templates/` is an authoring template, not something installed
+into your agent.
 
 ## Install in Pi
 
@@ -32,6 +36,19 @@ Pi loads skill names and descriptions at startup, then reads a skill's full
 instructions when relevant. You can also invoke one with `/skill:skill-name`.
 To pin an installation, append `@<tag-or-commit>` to the Git source.
 
+## Install in other agents
+
+The [`skills` CLI](https://github.com/vercel-labs/skills) installs skills from
+this collection into Claude Code, Codex, Cursor and other agents. For example,
+to install crayon-drawing for Claude Code in every project:
+
+```sh
+npx skills add scowalt/skills --skill crayon-drawing --agent claude-code --global
+```
+
+Run `npx skills update` to get newer versions. Each skill lists what it needs,
+such as Python, in its `compatibility` field.
+
 ## Add a skill
 
 ```sh
@@ -54,10 +71,8 @@ templates/
     SKILL.md       (not exported to Pi)
 ```
 
-The Pi manifest exports only `skills/`; there are no runtime dependencies, npm
-publication requirement, custom installer, or agent extensions. Other Agent
-Skills-compatible tools can use individual skill directories; installation
-commands vary by tool.
+The Pi manifest exports only `skills/`; there is no npm publication
+requirement, custom installer, or agent extension.
 
 ## Why this structure?
 
