@@ -1,0 +1,65 @@
+<div class="board">
+  <section class="panel">
+    <h3><b>1</b> You snap the receipt</h3>
+    <svg class="pic" viewBox="0 0 320 180" data-draw="snap" role="img" aria-label="Someone photographs a receipt with their phone and says snap!"></svg>
+    <p>Take a photo of any receipt in the app, same as today.</p>
+  </section>
+  <section class="panel">
+    <svg class="new" viewBox="0 0 64 30" data-draw="new" aria-hidden="true"></svg>
+    <h3><b>2</b> It uploads overnight</h3>
+    <svg class="pic" viewBox="0 0 320 180" data-draw="upload" role="img" aria-label="At 2am the receipt goes from the house up to the cloud"></svg>
+    <p>At 2am, while the phone charges on Wi-Fi, new receipts go up to the cloud.</p>
+    <span class="sticky">Not decided yet: whether it also uploads on mobile data.</span>
+  </section>
+  <section class="panel">
+    <svg class="new" viewBox="0 0 64 30" data-draw="new" aria-hidden="true"></svg>
+    <h3><b>3</b> A robot files it</h3>
+    <svg class="pic" viewBox="0 0 320 180" data-draw="file" role="img" aria-label="A robot, switched on, files the receipt into a store of receipts by month"></svg>
+    <p>Each receipt is filed under its month, and the photo is kept.</p>
+  </section>
+  <section class="panel later">
+    <h3>Still to come</h3>
+    <ul>
+      <li><svg viewBox="0 0 90 56" data-draw="report" aria-hidden="true"></svg>A monthly expense report<small>next quarter</small></li>
+    </ul>
+  </section>
+</div>
+<script>
+crayon.draw({
+  snap(P) {
+    P.sun(288, 32);
+    P.line(8, 166, 312, 166, GREEN, 3.2);
+    P.person(100, 164, { arms: [[86, 128], [128, 96]] });
+    P.phone(122, 62, 26, 44);
+    [[154, 70, 163, 64], [156, 84, 167, 84], [154, 98, 163, 104]].forEach(([x1, y1, x2, y2]) => P.line(x1, y1, x2, y2, ORANGE, 2));
+    P.bubble(48, 40, "snap!", { size: 13, to: [90, 82] });
+    P.doc(212, 104, 40, 52, { lines: 4 });
+  },
+  upload(P) {
+    P.clock(40, 46, 24, { hour: 2 });
+    P.text(40, 92, "2am", 13, INK, { anchor: "middle", bold: true });
+    P.line(8, 166, 312, 166, GREEN, 3.2);
+    P.house(128, 164);
+    P.cloud(258, 50, 100, 52);
+    P.text(258, 55, "the cloud", 12, INK, { anchor: "middle" });
+    P.arrow(176, 74, 214, 60, ORANGE, 2.8, -10);
+    P.at("rotate(-12 196 100)", () => P.doc(187, 88, 18, 24, { lines: 2 }));
+  },
+  file(P) {
+    P.robot(64, 168, { switch: "on", arms: [[22, 123], [106, 108]] });
+    P.doc(122, 112, 30, 38, { lines: 3 });
+    P.tick(164, 136, 1.4);
+    P.arrow(112, 98, 192, 80, ORANGE, 2.8, -16);
+    P.drum(250, 46, 136, 50, 12);
+    P.text(250, 84, "receipts", 15, INK, { anchor: "middle", bold: true });
+    P.text(250, 104, "by month", 12, INK, { anchor: "middle" });
+  },
+  report(P) {
+    P.dash = "5 4";
+    P.rect(24, 4, 38, 48, GRAY, 2.2);
+    P.dash = null;
+    [16, 26, 36].forEach((y) => P.line(30, y, 56, y, GRAY, 1.6));
+    P.text(68, 22, "$", 16, GRAY, { bold: true });
+  },
+});
+</script>
