@@ -1,21 +1,23 @@
 ---
 name: crayon-drawing
-description: Crayon drawings, hand-drawn kid-style pictures or storyboards shown inline in bb chat. Use when asked for a crayon drawing or a hand-drawn picture of how something works.
+description: Crayon drawings, hand-drawn kid-style pictures or storyboards of how something works, built as one self-contained HTML page. Use when asked for a crayon drawing or a hand-drawn picture of how something works.
+license: MIT
+compatibility: Needs Python 3.9 or later. The check step uses bb's headless browser in a bb thread, and Playwright for Python with Chromium, Chrome or Edge anywhere else. Pages load their handwriting fonts from Google Fonts and fall back to system fonts offline.
 ---
 
 # Crayon drawing
 
-The drawing library, page styles, build and check already exist in this skill. Write only the scene: each panel's words and one drawing function per picture. `<skill>` below is this skill's directory.
+The drawing library, page styles, build and check already exist in this skill. Write only the scene: each panel's words and one drawing function per picture. `<skill>` below is this skill's directory, and `<dir>` is where drawings go: `$BB_THREAD_STORAGE/reports` in a bb thread, otherwise `/tmp/crayon`.
 
 ## Steps
 
 1. **Facts.** Readers take a drawing as settled. Base each panel on what the code, spec or thread says, and mark anything undecided on the drawing itself, for example with a sticky note.
-2. **Scene.** Write `$BB_THREAD_STORAGE/reports/<name>.scene.html` in the format below. [assets/example.scene.html](assets/example.scene.html) is a complete scene to start from.
-3. **Build.** `python3 <skill>/scripts/build.py $BB_THREAD_STORAGE/reports/<name>.scene.html` writes `<name>.html` beside the scene: one self-contained page.
-4. **Check.** `python3 <skill>/scripts/check.py $BB_THREAD_STORAGE/reports/<name>.html` lists problems (failed drawings, text outside its picture or overlapping other text) and prints screenshot paths. Fix every listed problem. Then open every screenshot and fix whatever reads wrong: a label covered by a shape, a cramped or half-empty picture, a step that doesn't follow from the one before. Rebuild and check until the list is empty and the screenshots read right.
-5. **Show.** Put `::inline-vis{source="thread-storage" file="reports/<name>.html"}` in the reply.
+2. **Scene.** Write `<dir>/<name>.scene.html` in the format below. [assets/example.scene.html](assets/example.scene.html) is a complete scene to start from.
+3. **Build.** `python3 <skill>/scripts/build.py <dir>/<name>.scene.html` writes `<name>.html` beside the scene: one self-contained page.
+4. **Check.** `python3 <skill>/scripts/check.py <dir>/<name>.html` lists problems (failed drawings, text outside its picture or overlapping other text) and prints screenshot paths. Outside bb it runs in Playwright; when that isn't installed, run `uv run --no-project --with playwright python <skill>/scripts/check.py <dir>/<name>.html` instead. Fix every listed problem. Then open every screenshot and fix whatever reads wrong: a label covered by a shape, a cramped or half-empty picture, a step that doesn't follow from the one before. Rebuild and check until the list is empty and the screenshots read right.
+5. **Show.** In a bb thread, put `::inline-vis{source="thread-storage" file="reports/<name>.html"}` in the reply. Elsewhere, give the page's path, and open it in the user's browser when the agent runs on their machine (`open` on macOS, `xdg-open` on Linux).
 
-**Revisions** go in a new file: copy the scene to `<name>-v2.scene.html` and change the copy. The directive shows a file's current contents, so overwriting a page also changes the drawing in earlier messages.
+**Revisions** go in a new file: copy the scene to `<name>-v2.scene.html` and change the copy, so earlier versions stay as they were. In bb this matters more: the directive shows a file's current contents, so overwriting a page also changes the drawing in earlier messages.
 
 ## Scene format
 

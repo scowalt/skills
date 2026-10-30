@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Check a built crayon page in bb's headless browser.
+"""Check a built crayon page in a headless browser.
 
 Usage: check.py PAGE.html
 
 Lists drawings that failed, text that runs outside its picture or overlaps other
-text, and a page wider than the chat column. Then saves screenshots at the chat's
-desktop (710px) and phone (360px) widths and prints their paths.
-Exits 1 when it lists problems. Run it inside a bb thread.
+text, and a page wider than its column. Then saves screenshots at desktop (710px,
+bb's chat column) and phone (360px) widths and prints their paths.
+Exits 1 when it lists problems. In a bb thread it uses bb's headless browser;
+anywhere else it uses Playwright for Python.
 """
 
 import json
@@ -46,12 +47,20 @@ CHECK = """async () => {
           problems.push(`${name}: "${texts[i].textContent}" overlaps "${texts[j].textContent}"`);
       }
   }
-  if (document.documentElement.scrollWidth > innerWidth + 1) problems.push(`the page is wider than the ${innerWidth}px chat column`);
+  if (document.documentElement.scrollWidth > innerWidth + 1) problems.push(`the page is wider than its ${innerWidth}px column`);
   const notes = [];
   if (document.fonts && !document.fonts.check('16px "Patrick Hand"'))
     notes.push("the handwriting fonts didn't load, so the page used fallback fonts");
   return { height: Math.ceil(document.body.getBoundingClientRect().height), problems, notes };
 }"""
+
+PAGE_WIDTH = "() => document.documentElement.scrollWidth"
+UV = "uv run --no-project --with playwright"
+NO_PLAYWRIGHT = f"""Outside a bb thread, this check runs in Playwright for Python, which isn't installed here. Run it through uv:
+  {UV} python {Path(__file__).resolve()} PAGE.html
+or, without uv, install it with: python3 -m pip install playwright"""
+NO_BROWSER = f"""Playwright couldn't start Chromium, Chrome or Edge. Install Playwright's Chromium:
+  {UV} playwright install chromium"""
 
 
 def bb(*args, timeout=120):
@@ -65,19 +74,93 @@ def bb(*args, timeout=120):
     return data
 
 
-def run(session, script):
-    data = bb("browser-automation", "run", session, "--timeout", "90s", "--script", script, timeout=150)
-    if data.get("exitCode"):
-        sys.exit(f"The browser script failed:\n{data.get('text', '')}")
-    return data
+class BbBrowser:
+    """bb's headless browser, on the thread's machine."""
 
+    def __init__(self, thread):
+        opened = bb("browser-automation", "open", "--backend", "local", "--headless",
+                    "--machine", thread["environment"]["hostId"], timeout=240)
+        self.session = opened["id"]
+        print(f"previewDirective: {opened.get('previewDirective')}")
 
-def shoot(session, width, top, height):
-    clip = {"x": 0, "y": top, "width": width, "height": height}
-    script = f"""const p = await browser.getPage("crayon-check");
+    def run(self, script):
+        data = bb("browser-automation", "run", self.session, "--timeout", "90s", "--script", script, timeout=150)
+        if data.get("exitCode"):
+            sys.exit(f"The browser script failed:\n{data.get('text', '')}")
+        return data
+
+    def check(self, uri):
+        text = self.run(f"""const p = await browser.getPage("crayon-check");
+await p.setViewport({{ width: {DESKTOP}, height: {SHOT_HEIGHT} }});
+await p.goto({json.dumps(uri)});
+console.log("CRAYON " + JSON.stringify(await p.evaluate({CHECK})));
+undefined""").get("text", "")
+        line = next((l for l in text.splitlines() if l.startswith("CRAYON ")), None)
+        if not line:
+            sys.exit(f"The page check printed nothing:\n{text}")
+        return json.loads(line.removeprefix("CRAYON "))
+
+    def shoot(self, path, top, height):
+        clip = {"x": 0, "y": top, "width": DESKTOP, "height": height}
+        data = self.run(f"""const p = await browser.getPage("crayon-check");
 await p.shot({{ clip: {json.dumps(clip)}, maxEdge: 960, quality: 70 }});
-undefined"""
-    return run(session, script)["images"][0]["path"]
+undefined""")
+        shutil.copy(data["images"][0]["path"], path)
+
+    def phone(self, path):
+        """Screenshots the page at phone width and returns how wide the page is there."""
+        data = self.run(f"""const p = await browser.getPage("crayon-check");
+await p.setViewport({{ width: {PHONE}, height: 800 }});
+await new Promise((done) => setTimeout(done, 300));
+console.log("CRAYON " + JSON.stringify(await p.evaluate({PAGE_WIDTH})));
+await p.shot({{ maxEdge: 960, quality: 70 }});
+undefined""")
+        shutil.copy(data["images"][0]["path"], path)
+        return next((int(l.split()[1]) for l in data.get("text", "").splitlines() if l.startswith("CRAYON ")), PHONE)
+
+    def close(self):
+        subprocess.run([BB, "browser-automation", "close", self.session, "--json"], capture_output=True, timeout=60)
+
+
+class PlaywrightBrowser:
+    """Playwright's own Chromium, or else an installed Chrome or Edge."""
+
+    def __init__(self):
+        try:
+            from playwright.sync_api import Error, sync_playwright
+        except ImportError:
+            sys.exit(NO_PLAYWRIGHT)
+        self.playwright = sync_playwright().start()
+        for channel in (None, "chrome", "msedge"):
+            try:
+                self.browser = self.playwright.chromium.launch(channel=channel)
+                break
+            except Error:
+                pass
+        else:
+            self.playwright.stop()
+            sys.exit(NO_BROWSER)
+        self.page = self.browser.new_page(viewport={"width": DESKTOP, "height": SHOT_HEIGHT})
+
+    def check(self, uri):
+        self.page.goto(uri)
+        return self.page.evaluate(CHECK)
+
+    def shoot(self, path, top, height):
+        clip = {"x": 0, "y": top, "width": DESKTOP, "height": height}
+        self.page.screenshot(path=path, clip=clip, full_page=True, type="jpeg", quality=70)
+
+    def phone(self, path):
+        """Screenshots the page at phone width and returns how wide the page is there."""
+        self.page.set_viewport_size({"width": PHONE, "height": 800})
+        self.page.wait_for_timeout(300)
+        width = self.page.evaluate(PAGE_WIDTH)
+        self.page.screenshot(path=path, type="jpeg", quality=70)
+        return width
+
+    def close(self):
+        self.browser.close()
+        self.playwright.stop()
 
 
 def main(args):
@@ -86,50 +169,23 @@ def main(args):
     page = Path(args[0]).resolve()
     if not page.is_file():
         sys.exit(f"{page} doesn't exist; build the scene first.")
-    thread = bb("status").get("thread")
-    if not thread:
-        sys.exit("Run this inside a bb thread: it uses the thread's headless browser.")
+    thread = bb("status").get("thread") if os.environ.get("BB_THREAD_ID") else None
     out = Path(os.environ.get("BB_THREAD_STORAGE") or tempfile.gettempdir()) / "crayon-check" / page.stem
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
 
-    opened = bb("browser-automation", "open", "--backend", "local", "--headless",
-                "--machine", thread["environment"]["hostId"], timeout=240)
-    session = opened["id"]
-    print(f"previewDirective: {opened.get('previewDirective')}")
+    browser = BbBrowser(thread) if thread else PlaywrightBrowser()
     try:
-        script = f"""const p = await browser.getPage("crayon-check");
-await p.setViewport({{ width: {DESKTOP}, height: {SHOT_HEIGHT} }});
-await p.goto({json.dumps(page.as_uri())});
-console.log("CRAYON " + JSON.stringify(await p.evaluate({CHECK})));
-undefined"""
-        text = run(session, script).get("text", "")
-        line = next((l for l in text.splitlines() if l.startswith("CRAYON ")), None)
-        if not line:
-            sys.exit(f"The page check printed nothing:\n{text}")
-        report = json.loads(line.removeprefix("CRAYON "))
-
+        report = browser.check(page.as_uri())
         shots = []
         for i, top in enumerate(range(0, report["height"], SHOT_HEIGHT)[:MAX_SHOTS], 1):
-            path = out / f"desktop-{i}.jpg"
-            shutil.copy(shoot(session, DESKTOP, top, min(SHOT_HEIGHT, report["height"] - top)), path)
-            shots.append(path)
-
-        script = f"""const p = await browser.getPage("crayon-check");
-await p.setViewport({{ width: {PHONE}, height: 800 }});
-await new Promise((done) => setTimeout(done, 300));
-console.log("CRAYON " + JSON.stringify(await p.evaluate(() => document.documentElement.scrollWidth)));
-await p.shot({{ maxEdge: 960, quality: 70 }});
-undefined"""
-        phone = run(session, script)
-        width = next((int(l.split()[1]) for l in phone.get("text", "").splitlines() if l.startswith("CRAYON ")), PHONE)
-        if width > PHONE + 1:
-            report["problems"].append(f"the page is wider than the {PHONE}px phone column")
-        path = out / "phone-1.jpg"
-        shutil.copy(phone["images"][0]["path"], path)
-        shots.append(path)
+            shots.append(out / f"desktop-{i}.jpg")
+            browser.shoot(shots[-1], top, min(SHOT_HEIGHT, report["height"] - top))
+        shots.append(out / "phone-1.jpg")
+        if browser.phone(shots[-1]) > PHONE + 1:
+            report["problems"].append(f"the page is wider than a {PHONE}px phone")
     finally:
-        subprocess.run([BB, "browser-automation", "close", session, "--json"], capture_output=True, timeout=60)
+        browser.close()
 
     for note in report["notes"]:
         print(f"Note: {note}")
