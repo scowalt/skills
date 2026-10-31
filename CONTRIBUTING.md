@@ -17,7 +17,10 @@ and its dependencies. Installing this collection in Pi does not require these
 development tools.
 
 The pre-commit hook scans staged changes for secrets with Gitleaks and runs the
-checks. GitHub Actions runs the validation and tests, not secret scanning.
+checks. Woodpecker runs the same locked validation and tests on pull requests and
+main pushes, not secret scanning. Its pinned container matches the Python and uv
+versions in `.mise.toml`; update both together when changing those versions.
+Mission Control manages this repository's disabled GitHub Actions permission.
 
 ## Author a skill
 
