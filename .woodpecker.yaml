@@ -1,0 +1,22 @@
+when:
+  - event: pull_request
+  - event: push
+    branch: main
+
+labels:
+  ci_os: linux
+
+steps:
+  - name: validate
+    image: ghcr.io/astral-sh/uv:0.13.6-python3.15-trixie@sha256:f68dfb3eaf23a53afb5f74833bdacc0ce586d69f8063c48f9f3ebbe42e048e4a
+    commands:
+      - >-
+        python -c "import pathlib, subprocess, sys, tomllib;
+        tools = tomllib.loads(pathlib.Path('.mise.toml').read_text())['tools'];
+        assert sys.version.split()[0] == tools['python'];
+        assert subprocess.check_output(['uv', '--version']).decode().split()[1] == tools['uv']"
+      - uv run --locked python scripts/validate_skills.py
+  - name: test
+    image: ghcr.io/astral-sh/uv:0.13.6-python3.15-trixie@sha256:f68dfb3eaf23a53afb5f74833bdacc0ce586d69f8063c48f9f3ebbe42e048e4a
+    commands:
+      - uv run --locked python -m unittest discover -s tests -v
