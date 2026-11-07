@@ -5,7 +5,8 @@ Usage: check.py PAGE.html
 
 Lists drawings that failed, text that runs outside its picture or overlaps other
 text, and a page wider than its column. Then saves screenshots at desktop (710px,
-bb's chat column) and phone (360px) widths and prints their paths.
+bb's chat column) and phone (360px) widths and prints their paths, and saves the
+whole page at desktop width as PAGE.png beside the page.
 Exits 1 when it lists problems. In a bb thread it uses bb's headless browser;
 anywhere else it uses Playwright for Python.
 """
@@ -107,6 +108,12 @@ await p.shot({{ clip: {json.dumps(clip)}, maxEdge: 960, quality: 70 }});
 undefined""")
         shutil.copy(data["images"][0]["path"], path)
 
+    def png(self, path, height):
+        clip = {"x": 0, "y": 0, "width": DESKTOP, "height": height}
+        self.run(f"""const p = await browser.getPage("crayon-check");
+await p.screenshot({{ path: {json.dumps(str(path))}, type: "png", clip: {json.dumps(clip)}, captureBeyondViewport: true }});
+undefined""")
+
     def phone(self, path):
         """Screenshots the page at phone width and returns how wide the page is there."""
         data = self.run(f"""const p = await browser.getPage("crayon-check");
@@ -150,6 +157,10 @@ class PlaywrightBrowser:
         clip = {"x": 0, "y": top, "width": DESKTOP, "height": height}
         self.page.screenshot(path=path, clip=clip, full_page=True, type="jpeg", quality=70)
 
+    def png(self, path, height):
+        clip = {"x": 0, "y": 0, "width": DESKTOP, "height": height}
+        self.page.screenshot(path=path, clip=clip, full_page=True, type="png")
+
     def phone(self, path):
         """Screenshots the page at phone width and returns how wide the page is there."""
         self.page.set_viewport_size({"width": PHONE, "height": 800})
@@ -181,6 +192,7 @@ def main(args):
         for i, top in enumerate(range(0, report["height"], SHOT_HEIGHT)[:MAX_SHOTS], 1):
             shots.append(out / f"desktop-{i}.jpg")
             browser.shoot(shots[-1], top, min(SHOT_HEIGHT, report["height"] - top))
+        browser.png(page.with_suffix(".png"), report["height"])
         shots.append(out / "phone-1.jpg")
         if browser.phone(shots[-1]) > PHONE + 1:
             report["problems"].append(f"the page is wider than a {PHONE}px phone")
@@ -200,6 +212,7 @@ def main(args):
     print("Look at every screenshot:")
     for path in shots:
         print(f"  {path}")
+    print(f"The whole page as a PNG: {page.with_suffix('.png')}")
     return 1 if report["problems"] else 0
 
 
