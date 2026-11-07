@@ -1,4 +1,6 @@
+import base64
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -12,6 +14,27 @@ from scripts.validate_skills import ROOT
 SKILL = ROOT / "skills" / "crayon-drawing"
 EXAMPLE = (SKILL / "assets" / "example.scene.html").read_text()
 HAS_PLAYWRIGHT = importlib.util.find_spec("playwright") is not None
+
+# Stands in for gh: answers from the canned PR in $FAKE_GH_PR and logs each call, with its
+# --input payload, to $FAKE_GH_LOG.
+FAKE_GH = """#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+payload = json.load(sys.stdin) if "--input" in args else None
+with open(os.environ["FAKE_GH_LOG"], "a") as log:
+    log.write(json.dumps({"args": args, "payload": payload}) + "\\n")
+pr = os.environ.get("FAKE_GH_PR")
+if args[:2] == ["pr", "view"]:
+    if not pr:
+        sys.exit("no pull requests found for branch \\"main\\"")
+    print(pr)
+elif args[-1].endswith("/git/ref/heads/crayon-drawings"):
+    if not os.environ.get("FAKE_GH_BRANCH"):
+        sys.exit("gh: Not Found (HTTP 404)")
+    print(json.dumps({"object": {"sha": "tip"}}))
+else:
+    print(json.dumps({"sha": "new", "tree": {"sha": "tiptree"}}))
+"""
 
 
 def run(script, *args, env=None):
@@ -92,6 +115,84 @@ class CheckTests(CrayonTestCase):
         shots = [Path(line.strip()) for line in result.stdout.splitlines() if line.endswith(".jpg")]
         self.assertEqual(["desktop-1.jpg", "phone-1.jpg"], [shot.name for shot in shots])
         self.assertTrue(all(shot.is_file() for shot in shots))
+        self.assertTrue((self.root / "drawing.png").read_bytes().startswith(b"\x89PNG"))
+
+
+class AttachTests(CrayonTestCase):
+    URL = "https://github.com/owner/repo/pull/7"
+
+    def setUp(self):
+        super().setUp()
+        bin = self.root / "bin"
+        bin.mkdir()
+        (bin / "gh").write_text(FAKE_GH)
+        (bin / "gh").chmod(0o755)
+        self.log = self.root / "gh.jsonl"
+        self.env = os.environ | {"PATH": f"{bin}{os.pathsep}{os.environ['PATH']}", "FAKE_GH_LOG": str(self.log)}
+        self.png = self.root / "flow.png"
+        self.png.write_bytes(b"\x89PNG")
+
+    def attach(self, body=None, branch=False, png=None, *args):
+        env = self.env | ({"FAKE_GH_BRANCH": "1"} if branch else {})
+        if body is not None:
+            env["FAKE_GH_PR"] = json.dumps({"number": 7, "url": self.URL, "body": body})
+        return run("attach.py", png or self.png, *args, env=env)
+
+    def calls(self):
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def payloads(self, path):
+        return [c["payload"] for c in self.calls() if c["args"][0] == "api" and any(a.endswith(path) for a in c["args"])]
+
+    def new_body(self):
+        return self.calls()[-1]["payload"]["body"]
+
+    def test_without_a_pull_request_nothing_is_attached(self):
+        result = self.attach()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("No pull request found", result.stdout)
+        self.assertEqual(1, len(self.calls()))
+
+    def test_first_drawing_starts_the_branch_and_ends_the_description(self):
+        result = self.attach("What changed.")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(self.URL, result.stdout.strip())
+        [blob] = self.payloads("/git/blobs")
+        self.assertEqual(base64.b64encode(b"\x89PNG").decode(), blob["content"])
+        [commit] = self.payloads("/git/commits")
+        self.assertEqual([], commit["parents"])
+        self.assertEqual([{"ref": "refs/heads/crayon-drawings", "sha": "new"}], self.payloads("/git/refs"))
+        self.assertEqual(["api", "-X", "PATCH", "repos/owner/repo/pulls/7", "--input", "-"], self.calls()[-1]["args"])
+        self.assertEqual(
+            "What changed.\n\n<!-- crayon-drawing:flow -->\n"
+            "![flow](https://github.com/owner/repo/blob/new/pr-7/flow.png?raw=true)\n"
+            "<!-- /crayon-drawing:flow -->\n",
+            self.new_body(),
+        )
+
+    def test_revision_replaces_the_earlier_drawing(self):
+        self.attach("Intro.")
+        first = self.new_body()
+        revision = self.root / "flow-v2.png"
+        revision.write_bytes(b"\x89PNG2")
+        self.assertEqual(0, self.attach(first + "\nMore words.", True, revision).returncode)
+        self.assertEqual(["tip"], self.payloads("/git/commits")[-1]["parents"])
+        self.assertEqual([{"sha": "new"}], self.payloads("/git/refs/heads/crayon-drawings")[-1:])
+        body = self.new_body()
+        self.assertEqual(1, body.count("<!-- crayon-drawing:flow -->"))
+        self.assertIn("pr-7/flow-v2.png", body)
+        self.assertNotIn("pr-7/flow.png", body)
+        self.assertTrue(body.startswith("Intro.") and body.endswith("More words."))
+
+    def test_explicit_pull_request_is_passed_to_gh(self):
+        self.attach("", False, None, self.URL)
+        self.assertEqual(["pr", "view", self.URL, "--json", "number,url,body"], self.calls()[0]["args"])
+        self.assertTrue(self.new_body().startswith("<!-- crayon-drawing:flow -->"))
+
+    def test_only_pngs_are_attached(self):
+        page = self.root / "flow.html"
+        page.write_text("")
+        self.assertIn("isn't a PNG", self.attach("", png=page).stderr)
 
 
 if __name__ == "__main__":
