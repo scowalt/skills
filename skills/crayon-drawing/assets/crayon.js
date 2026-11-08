@@ -11,6 +11,13 @@
   const { INK, RED, ORANGE, YELLOW, GREEN, BLUE, SKY, BROWN, GRAY, PAPER } = COLORS;
   const f = (n) => n.toFixed(1);
 
+  // Measured on a canvas, which needs no layout: an SVG that is hidden while it draws measures its text as 0 wide.
+  const ruler = document.createElement("canvas").getContext("2d");
+  function textWidth(s, size) {
+    ruler.font = `${size}px "Patrick Hand", "Comic Sans MS", cursive`;
+    return ruler.measureText(s).width;
+  }
+
   function arc(cx, cy, rx, ry, a0, a1, n = 20) {
     const pts = [];
     for (let i = 0; i <= n; i++) {
@@ -256,9 +263,8 @@
       // A speech bubble sized to its words; `to: [x, y]` points its tail at the speaker. Returns { rx, ry }.
       bubble(cx, cy, s, o = {}) {
         const size = o.size || 11, lines = String(s).split("\n"), lineH = size * 1.15;
-        const t = P.text(cx, f(cy + size * 0.35 - ((lines.length - 1) * lineH) / 2), s, size, o.color || INK, { anchor: "middle" });
-        const parts = lines.length > 1 ? [...t.children] : [t];
-        const w = Math.max(...parts.map((e) => e.getComputedTextLength()));
+        P.text(cx, f(cy + size * 0.35 - ((lines.length - 1) * lineH) / 2), s, size, o.color || INK, { anchor: "middle" });
+        const w = Math.max(...lines.map((line) => textWidth(line, size)));
         const half = (lines.length * lineH) / 2;
         const ry = Math.max(16, half + 9), rx = (w / 2 + 7) / Math.sqrt(1 - (half / ry) ** 2);
         add(under, "ellipse", { cx, cy, rx: f(rx), ry: f(ry), fill: PAPER });
