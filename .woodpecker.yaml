@@ -8,7 +8,7 @@ labels:
 
 steps:
   - name: validate
-    image: ghcr.io/astral-sh/uv:0.13.7-python3.15-trixie@sha256:e251a906500a155fbd0940b1a01192f9ef941e6c493108a69fcc11bcafdf208d
+    image: ghcr.io/astral-sh/uv:0.13.8-python3.15-trixie@sha256:45f789a1d51b24112d1ca54f536beef82ca87ee5791335b452c3451f904445e6
     commands:
       - >-
         python -c "import pathlib, subprocess, sys, tomllib;
@@ -17,6 +17,6 @@ steps:
         assert subprocess.check_output(['uv', '--version']).decode().split()[1] == tools['uv']"
       - uv run --locked python scripts/validate_skills.py
   - name: test
-    image: ghcr.io/astral-sh/uv:0.13.7-python3.15-trixie@sha256:e251a906500a155fbd0940b1a01192f9ef941e6c493108a69fcc11bcafdf208d
+    image: ghcr.io/astral-sh/uv:0.13.8-python3.15-trixie@sha256:45f789a1d51b24112d1ca54f536beef82ca87ee5791335b452c3451f904445e6
     commands:
       - uv run --locked python -m unittest discover -s tests -v
