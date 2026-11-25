@@ -7,8 +7,8 @@ Lists drawings that failed, text that runs outside its picture or overlaps other
 text, and a page wider than its column. Then saves screenshots at desktop (710px,
 bb's chat column) and phone (360px) widths and prints their paths, and saves the
 whole page at desktop width as PAGE.png beside the page.
-Exits 1 when it lists problems. In a bb thread it uses bb's headless browser;
-anywhere else it uses Playwright for Python.
+Exits 1 when it lists problems. In a bb thread it uses a temporary, signed-out
+bb browser on the thread's host; anywhere else it uses Playwright for Python.
 """
 
 import json
@@ -76,11 +76,10 @@ def bb(*args, timeout=120):
 
 
 class BbBrowser:
-    """bb's headless browser, on the thread's machine."""
+    """A temporary bb browser on the thread's host, so the check never touches the user's signed-in profile."""
 
-    def __init__(self, thread):
-        opened = bb("browser-automation", "open", "--backend", "local", "--headless",
-                    "--machine", thread["environment"]["hostId"], timeout=240)
+    def __init__(self):
+        opened = bb("browser-automation", "open", "--temporary", timeout=240)
         self.session = opened["id"]
         print(f"previewDirective: {opened.get('previewDirective')}")
 
@@ -180,12 +179,11 @@ def main(args):
     page = Path(args[0]).resolve()
     if not page.is_file():
         sys.exit(f"{page} doesn't exist; build the scene first.")
-    thread = bb("status").get("thread") if os.environ.get("BB_THREAD_ID") else None
     out = Path(os.environ.get("BB_THREAD_STORAGE") or tempfile.gettempdir()) / "crayon-check" / page.stem
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
 
-    browser = BbBrowser(thread) if thread else PlaywrightBrowser()
+    browser = BbBrowser() if os.environ.get("BB_THREAD_ID") else PlaywrightBrowser()
     try:
         report = browser.check(page.as_uri())
         shots = []
