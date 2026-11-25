@@ -2,7 +2,7 @@
 name: crayon-drawing
 description: Crayon drawings, hand-drawn kid-style pictures or storyboards of how something works, built as one self-contained HTML page. Use when asked for a crayon drawing or a hand-drawn picture of how something works.
 license: MIT
-compatibility: Needs Python 3.9 or later. The check step uses bb's headless browser in a bb thread, and Playwright for Python with Chromium, Chrome or Edge anywhere else. Pages load their handwriting fonts from Google Fonts and fall back to system fonts offline. Attaching a drawing to a pull request needs, on GitHub, the GitHub CLI (gh) 2.102 or later logged in with push access, and on Gitea, a tea login for that server whose token can write to the repository.
+compatibility: Needs Python 3.9 or later. The check step uses a temporary, signed-out bb browser in a bb thread, and Playwright for Python with Chromium, Chrome or Edge anywhere else. Pages load their handwriting fonts from Google Fonts and fall back to system fonts offline. Attaching a drawing to a pull request needs, on GitHub, the GitHub CLI (gh) 2.102 or later logged in with push access, and on Gitea, a tea login for that server whose token can write to the repository.
 ---
 
 # Crayon drawing
